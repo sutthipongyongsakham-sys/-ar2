@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🚲 โยงเส้นทางให้ใกล้ที่สุด - สื่อการเรียนรู้ ป.4</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts (Mali & Kanit) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600;700&family=Mali:wght@500;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'p4-sky': '#38BDF8',
+                        'p4-green': '#10B981',
+                        'p4-yellow': '#F59E0B',
+                        'p4-pink': '#EC4899',
+                        'p4-dark': '#0F172A'
+                    },
+                    fontFamily: {
+                        kanit: ['Kanit', 'sans-serif'],
+                        mali: ['Mali', 'cursive']
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            font-family: 'Kanit', sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%);
+            min-height: 100vh;
+            touch-action: manipulation;
+            user-select: none;
+        }
+
+        .kids-font {
+            font-family: 'Mali', cursive;
+        }
+
+        /* Card & Button Neumorphic/Retro Flat Style */
+        .game-card {
+            border: 4px solid #0F172A;
+            box-shadow: 6px 6px 0px #0F172A;
+        }
+
+        .game-btn {
+            border: 3px solid #0F172A;
+            box-shadow: 4px 4px 0px #0F172A;
+            transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .game-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 6px 6px 0px #0F172A;
+        }
+
+        .game-btn:active:not(:disabled) {
+            transform: translate(2px, 2px);
+            box-shadow: 2px 2px 0px #0F172A;
+        }
+
+        .game-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: 2px 2px 0px #0F172A;
+        }
+
+        @keyframes float-slow {
+            0%, 100% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(-6px) rotate(2deg); }
+        }
+
+        .animate-float {
+            animation: float-slow 3s ease-in-out infinite;
+        }
+
+        @keyframes pop-in {
+            0% { transform: scale(0.9); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .animate-pop {
+            animation: pop-in 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+
+        /* Canvas Positioning Container */
+        #map-container {
+            position: relative;
+            width: 100%;
+            height: 380px;
+            background: #F8FAFC;
+            border-radius: 1rem;
+            overflow: hidden;
+        }
+
+        @media (min-width: 640px) {
+            #map-container {
+                height: 440px;
+            }
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center p-2 sm:p-4 text-slate-800">
+
+    <!-- Container หลักของแอปพลิเคชัน -->
+    <div class="w-full max-w-4xl bg-slate-100 rounded-3xl game-card overflow-hidden flex flex-col min-h-[680px] relative">
+        
+        <!-- แถบด้านบนแสดงชื่อเกม และสถิติ -->
+        <header class="bg-amber-400 p-3 sm:p-4 border-b-4 border-slate-900 flex flex-wrap items-center justify-between gap-2">
+            <!-- โลโก้และชื่อเกม -->
+            <div class="flex items-center gap-3">
+                <div class="bg-slate-900 text-yellow-300 p-2 sm:p-2.5 rounded-2xl text-2xl sm:text-3xl border-2 border-slate-900 shadow animate-float">
+                    🚲
+                </div>
+                <div>
+                    <h1 class="text-xl sm:text-2xl font-black text-slate-900 kids-font tracking-wide leading-none">
+                        โยงเส้นทางให้ใกล้ที่สุด
+                    </h1>
+                    <p class="text-xs font-bold text-slate-900 mt-1">
+                        พานักเรียนจากบ้านไปโรงเรียน โดยเลือกเส้นทางที่สั้นที่สุด
+                    </p>
+                </div>
+            </div>
+
+            <!-- แสดงระยะทางปัจจุบันและเวลา -->
+            <div class="flex items-center gap-3 bg-slate-900 text-white px-3 sm:px-4 py-2 rounded-2xl border-2 border-slate-900 ml-auto">
+                <!-- ระยะทางรวมปัจจุบัน -->
+                <div class="text-center px-1">
+                    <div class="text-[10px] text-amber-300 font-bold uppercase">ระยะทางรวม</div>
+                    <div class="text-sm sm:text-lg font-black text-white kids-font">
+                        <span id="current-distance" class="text-yellow-300">0.0</span> กม.
+                    </div>
+                </div>
+
+                <div class="h-6 w-0.5 bg-slate-700"></div>
+
+                <!-- จับเวลา -->
+                <div class="text-center px-1">
+                    <div class="text-[10px] text-sky-300 font-bold uppercase">เวลาที่ใช้</div>
+                    <div class="text-sm sm:text-lg font-black text-white kids-font">
+                        <span id="timer-text" class="text-sky-300">0</span> วิ
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- พื้นที่แสดงผลเกมหลัก -->
+        <main class="flex-1 p-3 sm:p-5 flex flex-col justify-between relative overflow-y-auto" id="main-content">
+
+            <!-- ส่วนแนะนำสั้นๆ และรายการเส้นทางที่เลือก -->
+            <div class="flex flex-wrap items-center justify-between gap-2 bg-white p-3 rounded-2xl border-2 border-slate-900 mb-3 shadow-sm">
+                <div class="flex items-center gap-2 text-xs sm:text-sm font-bold text-slate-700">
+                    <span class="bg-sky-500 text-white px-2 py-0.5 rounded-lg">วิธีเล่น</span>
+                    <span>เริ่มแตะที่ <strong class="text-emerald-600">🏠 บ้าน</strong> ➔ เลือกจุดเชื่อมต่อ ➔ ไปยัง <strong class="text-rose-600">🏫 โรงเรียน</strong></span>
+                </div>
+
+                <div class="text-xs font-bold text-slate-800 bg-slate-100 px-3 py-1 rounded-xl border border-slate-300">
+                    เส้นทางของคุณ: <span id="route-path-text" class="text-sky-600 font-black">🏠 บ้าน</span>
+                </div>
+            </div>
+
+            <!-- พื้นที่แผนที่ interactive 2D (Canvas) -->
+            <div id="map-container" class="game-card mb-3 relative">
+                <canvas id="gameCanvas" class="w-full h-full block cursor-pointer"></canvas>
+            </div>
+
+            <!-- ปุ่มควบคุมการเล่น -->
+            <div class="flex flex-wrap items-center justify-between gap-3 pt-1">
+                <button onclick="resetCurrentRoute()" class="game-btn bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold px-4 py-2.5 rounded-xl text-xs sm:text-sm flex items-center gap-2">
+                    <i class="fa-solid fa-rotate-left"></i> ล้างเส้นทางใหม่
+                </button>
+
+                <div class="flex items-center gap-2">
+                    <button id="btn-submit" onclick="checkAnswer()" disabled class="game-btn bg-emerald-400 hover:bg-emerald-300 text-slate-900 font-black text-sm sm:text-base px-6 py-2.5 rounded-xl kids-font flex items-center gap-2">
+                        <span>ตรวจคำตอบ</span> <i class="fa-solid fa-circle-check"></i>
+                    </button>
+                </div>
+            </div>
+
+        </main>
+
+        <!-- ส่วนล่างสุด -->
+        <footer class="bg-slate-200 p-2 text-center text-slate-600 text-xs font-semibold border-t-2 border-slate-300 flex items-center justify-between px-4">
+            <span>สื่อการเรียนรู้วิทยาการคำนวณ ชั้น ป.4</span>
+            <span class="hidden sm:inline">เรื่อง การวางแผนเส้นทางและการเปรียบเทียบระยะทาง</span>
+        </footer>
+    </div>
+
+    <!-- Modal ป๊อปอัพแสดงผลเมื่อตรวจคำตอบ -->
+    <div id="result-modal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50 animate-pop">
+        <div class="bg-white max-w-md w-full rounded-3xl p-6 game-card text-center relative overflow-hidden">
+            
+            <div id="modal-icon" class="text-6xl sm:text-7xl mb-2 animate-float">🎉</div>
+            <h2 id="modal-title" class="text-2xl sm:text-3xl font-black text-slate-900 kids-font mb-1">เก่งมาก!</h2>
+            <p id="modal-subtitle" class="text-slate-600 text-xs sm:text-sm font-semibold mb-4">คุณหาเส้นทางสั้นที่สุดพบแล้ว</p>
+
+            <!-- กล่องสรุปคะแนนและระยะทาง -->
+            <div class="bg-slate-50 p-4 rounded-2xl border-2 border-slate-200 mb-5 text-left space-y-2.5">
+                <div class="flex justify-between items-center border-b pb-2">
+                    <span class="text-xs text-slate-500 font-bold">ระยะทางที่คุณเลือก:</span>
+                    <span id="res-user-dist" class="text-sm font-black text-sky-600">12.5 กม.</span>
+                </div>
+                <div class="flex justify-between items-center border-b pb-2">
+                    <span class="text-xs text-slate-500 font-bold">ระยะทางที่สั้นที่สุด:</span>
+                    <span id="res-best-dist" class="text-sm font-black text-emerald-600">10.0 กม.</span>
+                </div>
+                <div class="flex justify-between items-center border-b pb-2">
+                    <span class="text-xs text-slate-500 font-bold">เวลาที่ใช้:</span>
+                    <span id="res-time-used" class="text-sm font-bold text-slate-800">15 วินาที</span>
+                </div>
+                <div class="flex justify-between items-center pt-1">
+                    <span class="text-xs text-slate-700 font-bold">คะแนนที่ได้:</span>
+                    <span id="res-score" class="text-2xl font-black text-amber-500 kids-font">100 / 100 ⭐</span>
+                </div>
+            </div>
+
+            <!-- ข้อความแนะนำ -->
+            <div id="modal-tip-box" class="p-3 bg-amber-50 rounded-xl border border-amber-300 text-xs font-bold text-amber-900 mb-5 text-center">
+                💡 คำแนะนำ: การเปรียบเทียบระยะทางของแต่ละเส้นทางช่วยให้เราวางแผนเวลาเดินทางได้ดีที่สุด!
+            </div>
+
+            <!-- ปุ่มดำเนินการต่อ -->
+            <div class="flex justify-center gap-3">
+                <button onclick="closeModalAndReset()" class="game-btn bg-amber-400 hover:bg-amber-300 text-slate-900 font-black text-base px-6 py-2.5 rounded-xl kids-font">
+                    <i class="fa-solid fa-rotate-right"></i> เล่นอีกครั้ง
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Toast แจ้งเตือนในเกม -->
+    <div id="toast-msg" class="fixed top-6 left-1/2 -translate-x-1/2 bg-slate-900 text-white px-5 py-3 rounded-2xl text-xs sm:text-sm font-bold opacity-0 transition-all duration-300 pointer-events-none z-50 shadow-2xl border-2 border-slate-700 flex items-center gap-2">
+        <span id="toast-icon" class="text-xl">⚠️</span> 
+        <span id="toast-text">ข้อความแจ้งเตือน</span>
+    </div>
+
+    <!-- Sound Synthesizer Web Audio API -->
+    <script>
+        class SoundSystem {
+            constructor() {
+                this.ctx = null;
+            }
+
+            initCtx() {
+                if (!this.ctx) {
+                    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                if (this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            }
+
+            playSelectNode() {
+                this.initCtx();
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(400, now);
+                osc.frequency.exponentialRampToValueAtTime(800, now + 0.08);
+
+                gain.gain.setValueAtTime(0.1, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                osc.start(now);
+                osc.stop(now + 0.08);
+            }
+
+            playWinSound() {
+                this.initCtx();
+                const now = this.ctx.currentTime;
+                const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+                notes.forEach((freq, idx) => {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(freq, now + idx * 0.1);
+
+                    gain.gain.setValueAtTime(0.15, now + idx * 0.1);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.1 + 0.25);
+
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+
+                    osc.start(now + idx * 0.1);
+                    osc.stop(now + idx * 0.1 + 0.25);
+                });
+            }
+
+            playErrorSound() {
+                this.initCtx();
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(220, now);
+                osc.frequency.setValueAtTime(160, now + 0.12);
+
+                gain.gain.setValueAtTime(0.12, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                osc.start(now);
+                osc.stop(now + 0.3);
+            }
+        }
+
+        const sound = new SoundSystem();
+    </script>
+
+    <!-- เกมและตรรกะการคำนวณเส้นทาง -->
+    <script>
+        /**
+         * ข้อมูลโครงสร้างจุด (Nodes) และเส้นทาง (Edges) ของแผนที่
+         * จุดเริ่มต้น: HOME
+         * จุดสิ้นสุด: SCHOOL
+         */
+        const mapNodes = [
+            { id: 'HOME', name: 'บ้าน', emoji: '🏠', x: 0.12, y: 0.50, color: '#10B981' },
+            { id: 'A', name: 'จุด A', emoji: '🏣', x: 0.32, y: 0.22, color: '#0284C7' },
+            { id: 'B', name: 'จุด B', emoji: '🏪', x: 0.35, y: 0.78, color: '#0284C7' },
+            { id: 'C', name: 'จุด C', emoji: '⛲', x: 0.55, y: 0.18, color: '#0284C7' },
+            { id: 'D', name: 'จุด D', emoji: '🛝', x: 0.62, y: 0.52, color: '#0284C7' },
+            { id: 'E', name: 'จุด E', emoji: 'ร้านไอศกรีม', x: 0.75, y: 0.82, color: '#0284C7' },
+            { id: 'SCHOOL', name: 'โรงเรียน', emoji: '🏫', x: 0.90, y: 0.48, color: '#E11D48' }
+        ];
+
+        // รายการเส้นเชื่อมระหว่างจุด พร้อมระบุระยะทาง (กิโลเมตร)
+        const mapEdges = [
+            { from: 'HOME', to: 'A', dist: 3.5 },
+            { from: 'HOME', to: 'B', dist: 2.8 },
+            { from: 'A', to: 'C', dist: 4.2 },
+            { from: 'A', to: 'B', dist: 3.0 },
+            { from: 'A', to: 'D', dist: 3.8 },
+            { from: 'B', to: 'D', dist: 4.5 },
+            { from: 'B', to: 'E', dist: 3.2 },
+            { from: 'C', to: 'D', dist: 2.5 },
+            { from: 'C', to: 'SCHOOL', dist: 5.8 },
+            { from: 'D', to: 'E', dist: 2.2 },
+            { from: 'D', to: 'SCHOOL', dist: 3.0 },
+            { from: 'E', to: 'SCHOOL', dist: 2.5 }
+        ];
+
+        // สถานะของเกม (Game State)
+        let selectedPath = ['HOME']; // เริ่มต้นที่บ้านเสมอ
+        let currentTotalDistance = 0;
+        let timerSeconds = 0;
+        let timerInterval = null;
+        let isGameFinished = false;
+        let shortestPathDist = 0;
+
+        // ตัวแปร Canvas
+        let canvas, ctx;
+
+        // เริ่มต้นเมื่อโหลดหน้าเว็บ
+        window.onload = function() {
+            canvas = document.getElementById('gameCanvas');
+            ctx = canvas.getContext('2d');
+
+            // คำนวณหาเส้นทางที่สั้นที่สุดล่วงหน้าด้วยอัลกอริทึม
+            shortestPathDist = calculateShortestPath();
+
+            // รองรับ Event การคลิก / แตะ
+            canvas.addEventListener('click', handleCanvasClick);
+            canvas.addEventListener('touchstart', handleCanvasTouch, { passive: false });
+
+            window.addEventListener('resize', resizeCanvas);
+            resizeCanvas();
+
+            startTimer();
+            updateUI();
+        };
+
+        // ปรับขนาด Canvas ให้เหมาะกับหน้าจอ (Responsive DPI)
+        function resizeCanvas() {
+            const container = document.getElementById('map-container');
+            const rect = container.getBoundingClientRect();
+            
+            canvas.width = rect.width * (window.devicePixelRatio || 1);
+            canvas.height = rect.height * (window.devicePixelRatio || 1);
+            
+            drawMap();
+        }
+
+        // ตัวจับเวลา
+        function startTimer() {
+            clearInterval(timerInterval);
+            timerSeconds = 0;
+            document.getElementById('timer-text').innerText = timerSeconds;
+            timerInterval = setInterval(() => {
+                if (!isGameFinished) {
+                    timerSeconds++;
+                    document.getElementById('timer-text').innerText = timerSeconds;
+                }
+            }, 1000);
+        }
+
+        // ค้นหาเส้นทางที่สั้นที่สุดด้วยอัลกอริทึม DFS/Dijkstra เพื่อใช้เป็นเกณฑ์เฉลย
+        function calculateShortestPath() {
+            let minDistance = Infinity;
+
+            function dfs(currentNodeId, currentDist, visited) {
+                if (currentNodeId === 'SCHOOL') {
+                    if (currentDist < minDistance) {
+                        minDistance = currentDist;
+                    }
+                    return;
+                }
+
+                // ค้นหาจุดถัดไปที่เชื่อมต่ออยู่
+                mapEdges.forEach(edge => {
+                    let nextNode = null;
+                    if (edge.from === currentNodeId) nextNode = edge.to;
+                    if (edge.to === currentNodeId) nextNode = edge.from;
+
+                    if (nextNode && !visited.includes(nextNode)) {
+                        dfs(nextNode, currentDist + edge.dist, [...visited, nextNode]);
+                    }
+                });
+            }
+
+            dfs('HOME', 0, ['HOME']);
+            return minDistance;
+        }
+
+        // ฟังก์ชันวาดแผนที่ 2D บน Canvas
+        function drawMap() {
+            if (!canvas || !ctx) return;
+
+            const w = canvas.width;
+            const h = canvas.height;
+            const dpr = window.devicePixelRatio || 1;
+
+            ctx.clearRect(0, 0, w, h);
+
+            // 1. วาดเส้นเชื่อมต่อทั้งหมด (Background Roads)
+            mapEdges.forEach(edge => {
+                const nodeFrom = mapNodes.find(n => n.id === edge.from);
+                const nodeTo = mapNodes.find(n => n.id === edge.to);
+
+                const x1 = nodeFrom.x * w;
+                const y1 = nodeFrom.y * h;
+                const x2 = nodeTo.x * w;
+                const y2 = nodeTo.y * h;
+
+                // เช็คว่าเป็นเส้นที่ผู้เล่นเลือกหรือไม่
+                const isSelectedEdge = isEdgeInPath(edge.from, edge.to);
+
+                ctx.beginPath();
+                ctx.moveTo(x1, y1);
+                ctx.lineTo(x2, y2);
+
+                if (isSelectedEdge) {
+                    ctx.strokeStyle = '#F59E0B'; // สีส้มทองเมื่อถูกเลือก
+                    ctx.lineWidth = 8 * dpr;
+                    ctx.lineCap = 'round';
+                } else {
+                    ctx.strokeStyle = '#CBD5E1'; // สีเทาถนนปกติ
+                    ctx.lineWidth = 4 * dpr;
+                    ctx.lineCap = 'round';
+                }
+                ctx.stroke();
+
+                // วาดตัวเลขระยะทางบนเส้น
+                const midX = (x1 + x2) / 2;
+                const midY = (y1 + y2) / 2;
+
+                // พื้นหลังข้อความระยะทาง
+                ctx.fillStyle = isSelectedEdge ? '#FEF3C7' : '#FFFFFF';
+                ctx.beginPath();
+                ctx.arc(midX, midY, 13 * dpr, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.strokeStyle = isSelectedEdge ? '#F59E0B' : '#94A3B8';
+                ctx.lineWidth = 1.5 * dpr;
+                ctx.stroke();
+
+                // ตัวเลขกิโลเมตร
+                ctx.fillStyle = isSelectedEdge ? '#92400E' : '#475569';
+                ctx.font = `bold ${10 * dpr}px Kanit`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(`${edge.dist}`, midX, midY);
+            });
+
+            // 2. วาดจุด (Nodes)
+            mapNodes.forEach(node => {
+                const nx = node.x * w;
+                const ny = node.y * h;
+                const isVisited = selectedPath.includes(node.id);
+                const isCurrentLast = selectedPath[selectedPath.length - 1] === node.id;
+
+                const nodeRadius = 22 * dpr;
+
+                // แสงออร่ารอบจุดปัจจุบัน
+                if (isCurrentLast && !isGameFinished) {
+                    ctx.beginPath();
+                    ctx.arc(nx, ny, nodeRadius + (6 * dpr), 0, Math.PI * 2);
+                    ctx.fillStyle = 'rgba(56, 189, 248, 0.35)';
+                    ctx.fill();
+                }
+
+                // วาดวงกลมฐานจุด
+                ctx.beginPath();
+                ctx.arc(nx, ny, nodeRadius, 0, Math.PI * 2);
+
+                if (node.id === 'HOME') {
+                    ctx.fillStyle = '#10B981';
+                } else if (node.id === 'SCHOOL') {
+                    ctx.fillStyle = '#E11D48';
+                } else if (isVisited) {
+                    ctx.fillStyle = '#38BDF8';
+                } else {
+                    ctx.fillStyle = '#FFFFFF';
+                }
+                ctx.fill();
+
+                ctx.strokeStyle = '#0F172A';
+                ctx.lineWidth = 3 * dpr;
+                ctx.stroke();
+
+                // วาด Emoji / ชื่อจุด
+                ctx.font = `${18 * dpr}px sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(node.emoji, nx, ny - (2 * dpr));
+
+                // ชื่อป้ายจุดกำกับด้านล่าง
+                ctx.fillStyle = '#0F172A';
+                ctx.font = `bold ${11 * dpr}px Kanit`;
+                ctx.fillText(node.name, nx, ny + nodeRadius + (12 * dpr));
+            });
+        }
+
+        // ตรวจสอบว่าเส้นเชื่อม Edge นี้ถูกเลือกอยู่ในลำดับเส้นทางหรือไม่
+        function isEdgeInPath(u, v) {
+            for (let i = 0; i < selectedPath.length - 1; i++) {
+                const p1 = selectedPath[i];
+                const p2 = selectedPath[i + 1];
+                if ((p1 === u && p2 === v) || (p1 === v && p2 === u)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        // จัดการเมื่อแตะบน Canvas มือถือ
+        function handleCanvasTouch(e) {
+            e.preventDefault();
+            const rect = canvas.getBoundingClientRect();
+            const touch = e.touches[0];
+            const clickX = (touch.clientX - rect.left) / rect.width;
+            const clickY = (touch.clientY - rect.top) / rect.height;
+            processNodeSelection(clickX, clickY);
+        }
+
+        // จัดการเมื่อคลิกบน Canvas
+        function handleCanvasClick(e) {
+            const rect = canvas.getBoundingClientRect();
+            const clickX = (e.clientX - rect.left) / rect.width;
+            const clickY = (e.clientY - rect.top) / rect.height;
+            processNodeSelection(clickX, clickY);
+        }
+
+        // ประมวลผลการเลือกจุด
+        function processNodeSelection(clickX, clickY) {
+            if (isGameFinished) return;
+
+            // ค้นหาจุดที่ใกล้ตำแหน่งคลิกมากที่สุด
+            const clickedNode = mapNodes.find(node => {
+                const dist = Math.hypot(node.x - clickX, node.y - clickY);
+                return dist < 0.08; // รัศมีคลิกสัมผัส
+            });
+
+            if (!clickedNode) return;
+
+            const currentLastNode = selectedPath[selectedPath.length - 1];
+
+            // 1. ถ้สเลือกจุดเดิมที่เพิ่งเลือกไป -> ไม่ทำอะไร
+            if (clickedNode.id === currentLastNode) return;
+
+            // 2. ถ้าเลือกจุดถัดไปที่เชื่อมต่อกันอยู่
+            const edge = findEdge(currentLastNode, clickedNode.id);
+
+            if (edge) {
+                // เช็คว่าย้อนกลับไปจุดก่อนหน้าเพื่อยกเลิกการเลือกหรือไม่
+                if (selectedPath.length >= 2 && selectedPath[selectedPath.length - 2] === clickedNode.id) {
+                    // ย้อนกลับ 1 ขั้น
+                    const popped = selectedPath.pop();
+                    sound.playSelectNode();
+                    calculateTotalDistance();
+                    updateUI();
+                    drawMap();
+                    return;
+                }
+
+                // ห้ามเลือกจุดที่เคยเดินผ่านไปแล้ว (ป้องกันการเดินวน)
+                if (selectedPath.includes(clickedNode.id)) {
+                    sound.playErrorSound();
+                    showToast('⚠️ คุณเคยเลือกจุดนี้ไปแล้ว ห้ามเดินย้อนวนซ้ำนะ!', '⚠️');
+                    return;
+                }
+
+                // เลือกจุดสำเร็จ!
+                selectedPath.push(clickedNode.id);
+                sound.playSelectNode();
+                calculateTotalDistance();
+                updateUI();
+                drawMap();
+
+                // ถ้าถึงโรงเรียนแล้ว
+                if (clickedNode.id === 'SCHOOL') {
+                    showToast('🎉 ถึงโรงเรียนแล้ว! กดปุ่ม "ตรวจคำตอบ" ได้เลย', '🏫');
+                }
+
+            } else {
+                // ไม่มีเส้นทางเชื่อมต่อกันโดยตรง
+                sound.playErrorSound();
+                showToast(`❌ ไม่มีเส้นทางตรงจาก ${getNodeName(currentLastNode)} ไปยัง ${clickedNode.name}`, '❌');
+            }
+        }
+
+        // ค้นหาเส้นเชื่อมระหว่างสองจุด
+        function findEdge(u, v) {
+            return mapEdges.find(e => (e.from === u && e.to === v) || (e.from === v && e.to === u));
+        }
+
+        // คำนวณระยะทางรวมของเส้นทางที่เลือก
+        function calculateTotalDistance() {
+            currentTotalDistance = 0;
+            for (let i = 0; i < selectedPath.length - 1; i++) {
+                const edge = findEdge(selectedPath[i], selectedPath[i + 1]);
+                if (edge) {
+                    currentTotalDistance += edge.dist;
+                }
+            }
+            // แปลงเป็นทศนิยม 1 ตำแหน่ง
+            currentTotalDistance = Math.round(currentTotalDistance * 10) / 10;
+        }
+
+        // แปลง ID จุดเป็นชื่อภาษาไทยพร้อม Emoji
+        function getNodeName(id) {
+            const n = mapNodes.find(node => node.id === id);
+            return n ? `${n.emoji} ${n.name}` : id;
+        }
+
+        // อัปเดตข้อมูลบนหน้าจอ UI
+        function updateUI() {
+            document.getElementById('current-distance').innerText = currentTotalDistance.toFixed(1);
+
+            // อัปเดตป้ายข้อความเส้นทาง
+            const pathText = selectedPath.map(id => getNodeName(id)).join(' ➔ ');
+            document.getElementById('route-path-text').innerText = pathText;
+
+            // เปิด/ปิดปุ่มตรวจคำตอบ (เปิดใช้งานเมื่อเดินทางถึงโรงเรียนเท่านั้น)
+            const isAtSchool = selectedPath[selectedPath.length - 1] === 'SCHOOL';
+            const btnSubmit = document.getElementById('btn-submit');
+            btnSubmit.disabled = !isAtSchool;
+        }
+
+        // รีเซ็ตเส้นทางกลับไปเริ่มต้นที่บ้าน
+        function resetCurrentRoute() {
+            sound.playSelectNode();
+            selectedPath = ['HOME'];
+            currentTotalDistance = 0;
+            isGameFinished = false;
+            updateUI();
+            drawMap();
+            showToast('🔄 เริ่มต้นเลือกเส้นทางใหม่จากบ้าน', '🏠');
+        }
+
+        // ตรวจคำตอบการเปรียบเทียบระยะทาง
+        function checkAnswer() {
+            if (selectedPath[selectedPath.length - 1] !== 'SCHOOL') return;
+
+            isGameFinished = true;
+            clearInterval(timerInterval);
+
+            const isShortest = Math.abs(currentTotalDistance - shortestPathDist) < 0.05;
+
+            // คำนวณคะแนน (เต็ม 100)
+            // ถ้าเป็นเส้นทางที่สั้นที่สุดได้ 100 คะแนน
+            // ถ้าไม่ใช่ หักคะแนนตามระยะทางที่เกิน (กิโลเมตรละ 15 คะแนน)
+            let score = 100;
+            if (!isShortest) {
+                const diff = currentTotalDistance - shortestPathDist;
+                score = Math.max(10, Math.round(100 - (diff * 18)));
+            }
+
+            // แสดง Modal ผลลัพธ์
+            const modal = document.getElementById('result-modal');
+            const icon = document.getElementById('modal-icon');
+            const title = document.getElementById('modal-title');
+            const subtitle = document.getElementById('modal-subtitle');
+            const userDistEl = document.getElementById('res-user-dist');
+            const bestDistEl = document.getElementById('res-best-dist');
+            const timeUsedEl = document.getElementById('res-time-used');
+            const scoreEl = document.getElementById('res-score');
+            const tipBox = document.getElementById('modal-tip-box');
+
+            userDistEl.innerText = `${currentTotalDistance.toFixed(1)} กิโลเมตร`;
+            bestDistEl.innerText = `${shortestPathDist.toFixed(1)} กิโลเมตร`;
+            timeUsedEl.innerText = `${timerSeconds} วินาที`;
+            scoreEl.innerText = `${score} / 100 ⭐`;
+
+            if (isShortest) {
+                sound.playWinSound();
+                icon.innerText = '🎉';
+                title.innerText = 'สุดยอดมาก! เก่งที่สุด';
+                subtitle.innerText = 'คุณเลือกเส้นทางที่สั้นที่สุดได้อย่างถูกต้อง!';
+                tipBox.className = 'p-3 bg-emerald-50 rounded-xl border border-emerald-300 text-xs font-bold text-emerald-900 mb-5 text-center';
+                tipBox.innerHTML = '🌟 **สรุปเรียนรู้:** การเรียงลำดับและเปรียบเทียบระยะทางรวม ช่วยให้เราประหยัดเวลาและพลังงานได้ดีที่สุด!';
+            } else {
+                sound.playErrorSound();
+                icon.innerText = '😊';
+                title.innerText = 'ลองอีกครั้งนะ!';
+                subtitle.innerText = `เส้นทางนี้ยาวกว่าเส้นทางสั้นที่สุดอยู่ ${(currentTotalDistance - shortestPathDist).toFixed(1)} กม.`;
+                tipBox.className = 'p-3 bg-amber-50 rounded-xl border border-amber-300 text-xs font-bold text-amber-900 mb-5 text-center';
+                tipBox.innerHTML = '💡 **คำใบ้:** ลองสังเกตตัวเลขระยะทางบนแต่ละเส้น แล้วลองเลือกเส้นทางอื่นที่ผ่านจุด D ดูสิ!';
+            }
+
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        // ปิด Modal แล้วเริ่มเล่นใหม่
+        function closeModalAndReset() {
+            sound.playSelectNode();
+            const modal = document.getElementById('result-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+
+            resetCurrentRoute();
+            startTimer();
+        }
+
+        // แสดงข้อความแจ้งเตือน Toast
+        function showToast(msg, icon = '⚠️') {
+            const toast = document.getElementById('toast-msg');
+            document.getElementById('toast-text').innerText = msg;
+            document.getElementById('toast-icon').innerText = icon;
+
+            toast.classList.remove('opacity-0');
+            toast.classList.add('opacity-100');
+
+            setTimeout(() => {
+                toast.classList.remove('opacity-100');
+                toast.classList.add('opacity-0');
+            }, 2800);
+        }
+    </script>
+</body>
+</html>
